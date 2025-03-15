@@ -31,7 +31,7 @@ output          o_valid
 reg [8:0] wr_pixel_pos;
 reg [1:0] wr_lb;
 
-//reg [8:0] rd_pixel_pos;
+reg [8:0] rd_pixel_pos;
 reg rd_lb;
 reg [3:0] rd_data;
 
@@ -40,7 +40,17 @@ reg [10:0] total_pixel_count;
 reg [3:0] lb_i_valid;
 reg [23:0] lb_i_data [3:0];
 
+wire [23:0] lb0_data;
+wire [23:0] lb1_data;
+wire [23:0] lb2_data;
+wire [23:0] lb3_data;
+
+reg [71:0] o_data_reg;
+
 integer i, j;
+
+assign o_valid = rd_lb;
+assign o_pixel_data = o_data_reg;
 
 always @(*) begin
     for (i=0; i<4; i=i+1) begin
@@ -81,16 +91,49 @@ always @(posedge i_clk) begin
     end
 end
 
+always @(posedge i_clk) begin
+
+end
+
 parameter WAIT=0, READ=1;
-//always @(posedge i_clk) begin
-//    if (i_rst) begin
-//        rd_pixel_pos <= 0;
-//    end else if (rd_pixel_pos == 509) begin
-//        rd_pixel_pos <= 0;
-//    end else if (rd_lb) begin
-//        rd_pixel_pos <= rd_pixel_pos + 'd1;
-//    end
-//end
+reg state, next_state;
+reg out_state;
+
+always @(*) begin
+    case (state)
+        WAIT: begin
+            if (total_pixel_count == 1536) begin
+                next_state = READ;
+            end
+        end
+
+        READ: begin
+            if (rd_pixel_pos == 511) begin
+                next_state = WAIT;
+            end
+        end
+    endcase
+
+    rd_lb = out_state;
+end
+
+always @(posedge i_clk) begin
+    if (i_rst) begin
+        state <= WAIT;
+        out_state = 'd0;
+    end else begin
+        state <= next_state;
+        out_state <= next_state;
+    end
+end
+
+always @(posedge i_clk) begin
+    if (i_rst) begin
+        rd_pixel_pos <= 0;
+    end else if (rd_lb) begin
+        rd_pixel_pos <= rd_pixel_pos + 'd1;
+    end   
+end
 
 always @(posedge i_clk) begin
     if (i_rst) begin
@@ -100,12 +143,30 @@ always @(posedge i_clk) begin
     end
 end
 
+always @(*)
+begin
+    case(wr_lb)
+        0:begin
+            o_data_reg = {lb1_data, lb2_data, lb3_data};
+        end
+        1:begin
+            o_data_reg = {lb2_data, lb3_data, lb0_data};
+        end
+        2:begin
+            o_data_reg = {lb3_data, lb0_data, lb0_data};
+        end
+        3:begin
+            o_data_reg = {lb0_data, lb1_data, lb2_data};
+        end
+    endcase
+end
+
 line_buffer lb0(
     .i_clk(i_clk),
     .i_rst(i_rst),
     .i_pixel(i_pixel_data),
     .i_pixel_valid(lb_i_valid[0]),
-    .o_data(),
+    .o_data(lb0_data),
     .i_read_data(rd_data[0])
  ); 
 
@@ -114,7 +175,7 @@ line_buffer lb1(
     .i_rst(i_rst),
     .i_pixel(i_pixel_data),
     .i_pixel_valid(lb_i_valid[1]),
-    .o_data(),
+    .o_data(lb1_data),
     .i_read_data(rd_data[1])
  ); 
 
@@ -123,7 +184,7 @@ line_buffer lb2(
     .i_rst(i_rst),
     .i_pixel(i_pixel_data),
     .i_pixel_valid(lb_i_valid[2]),
-    .o_data(),
+    .o_data(lb2_data),
     .i_read_data(rd_data[2])
  );
 
@@ -132,7 +193,7 @@ line_buffer lb3(
     .i_rst(i_rst),
     .i_pixel(i_pixel_data),
     .i_pixel_valid(lb_i_valid[3]),
-    .o_data(),
+    .o_data(lb3_data),
     .i_read_data(rd_data[3])
  ); 
 
