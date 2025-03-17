@@ -38,7 +38,6 @@ reg [3:0] rd_data;
 reg [10:0] total_pixel_count;
 
 reg [3:0] lb_i_valid;
-reg [23:0] lb_i_data [3:0];
 
 wire [23:0] lb0_data;
 wire [23:0] lb1_data;
@@ -47,7 +46,7 @@ wire [23:0] lb3_data;
 
 reg [71:0] o_data_reg;
 
-integer i, j;
+integer i;
 
 assign o_valid = rd_lb;
 assign o_pixel_data = o_data_reg;
@@ -75,7 +74,7 @@ end
 always @(posedge i_clk) begin
     if (i_rst) begin
         wr_pixel_pos <= 0;
-    end else if (i_pixel_data) begin
+    end else if (i_valid) begin
         wr_pixel_pos <= wr_pixel_pos + 'd1;
     end
 end
@@ -91,18 +90,15 @@ always @(posedge i_clk) begin
     end
 end
 
-always @(posedge i_clk) begin
-
-end
-
 parameter WAIT=0, READ=1;
 reg state, next_state;
 reg out_state;
 
 always @(*) begin
+    next_state = state;
     case (state)
         WAIT: begin
-            if (total_pixel_count == 1536) begin
+            if (total_pixel_count >= 1536) begin
                 next_state = READ;
             end
         end
@@ -120,7 +116,7 @@ end
 always @(posedge i_clk) begin
     if (i_rst) begin
         state <= WAIT;
-        out_state = 'd0;
+        out_state <= 'd0;
     end else begin
         state <= next_state;
         out_state <= next_state;
@@ -153,7 +149,7 @@ begin
             o_data_reg = {lb2_data, lb3_data, lb0_data};
         end
         2:begin
-            o_data_reg = {lb3_data, lb0_data, lb0_data};
+            o_data_reg = {lb3_data, lb0_data, lb1_data};
         end
         3:begin
             o_data_reg = {lb0_data, lb1_data, lb2_data};
