@@ -32,10 +32,10 @@ integer i, j, k;
 reg [7:0] kernel [8:0];
 reg [15:0] mult_holder [8:0];
 reg [15:0] add_holder;
-reg [8:0] final;
+reg [15:0] add_holder_pipelined;
 
-wire mult_holder_valid;
-wire add_holder_valid;
+reg mult_holder_valid;
+reg add_holder_valid;
 
 initial begin
     for (i=0; i<9; i=i+1) begin
@@ -61,17 +61,18 @@ end
 
 always @(posedge i_clk) begin
     if (mult_holder_valid) begin
-        final <= add_holder/9;
+        add_holder_pipelined <= add_holder;
     end
 
-    final_valid <= mult_holder_valid;
+    add_holder_valid <= mult_holder_valid;
 end
 
 always @(posedge i_clk) begin
-    if (final_valid)
-        o_pixel <= add_holder;
+    if (add_holder_valid) begin
+        o_pixel <= add_holder_pipelined/9;
+    end
 
-    o_valid <= final_valid;
+    o_valid <= add_holder_valid;
 end
 
 endmodule
