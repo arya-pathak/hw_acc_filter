@@ -25,7 +25,8 @@ input           i_rst,
 input [7:0]     i_pixel_data,
 input           i_valid,
 output [71:0]   o_pixel_data,
-output          o_valid
+output          o_valid,
+output reg      o_intr
     );
 
 reg [8:0] wr_pixel_pos;
@@ -91,6 +92,7 @@ always @(posedge i_clk) begin
 end
 
 parameter WAIT=0, READ=1;
+reg interrupt_state;
 reg state, next_state;
 reg out_state;
 
@@ -98,6 +100,7 @@ always @(*) begin
     next_state = state;
     case (state)
         WAIT: begin
+            interrupt_state = 'd0;
             if (total_pixel_count >= 1536) begin
                 next_state = READ;
             end
@@ -106,6 +109,7 @@ always @(*) begin
         READ: begin
             if (rd_pixel_pos == 511) begin
                 next_state = WAIT;
+                interrupt_state = 'd1;
             end
         end
     endcase
@@ -117,9 +121,11 @@ always @(posedge i_clk) begin
     if (i_rst) begin
         state <= WAIT;
         out_state <= 'd0;
+        o_intr <= 0;
     end else begin
         state <= next_state;
         out_state <= next_state;
+        o_intr <= interrupt_state;
     end
 end
 
