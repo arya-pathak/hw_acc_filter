@@ -19,6 +19,7 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
+// `define blur;
 
 module mac(
 input               i_clk,
@@ -29,6 +30,8 @@ output reg          o_valid
     );
 
 integer i, j, k;
+
+`ifdef blur
 reg [7:0] kernel [8:0];
 reg [15:0] mult_holder [8:0];
 reg [15:0] add_holder;
@@ -75,9 +78,111 @@ always @(posedge i_clk) begin
     o_valid <= add_holder_valid;
 end
 
+`else
+reg [7:0] kernel1 [8:0];
+reg [7:0] kernel2 [8:0];
+reg [15:0] mult_holder1 [8:0];
+reg [15:0] mult_holder2 [8:0];
+reg [15:0] add_holder1;
+reg [15:0] add_holder_pipelined1;
+reg [15:0] add_holder2;
+reg [15:0] add_holder_pipelined2;
+reg mult_holder_valid1;
+reg add_holder_valid1;
+reg mult_holder_valid2;
+reg add_holder_valid2;
+reg [31:0] g1;
+reg [31:0] g2;
+reg [32:0] threshold;
+reg square_holder_valid1;
+reg square_holder_valid2;
+reg threshold_valid;
+
+initial begin
+    kernel1[0] =  1;
+    kernel1[1] =  0;
+    kernel1[2] = -1;
+    kernel1[3] =  2;
+    kernel1[4] =  0;
+    kernel1[5] = -2;
+    kernel1[6] =  1;
+    kernel1[7] =  0;
+    kernel1[8] = -1;
+
+    kernel2[0] =  1;
+    kernel2[1] =  2;
+    kernel2[2] =  1;
+    kernel2[3] =  0;
+    kernel2[4] =  0;
+    kernel2[5] =  0;
+    kernel2[6] = -1;
+    kernel2[7] = -2;
+    kernel2[8] = -1;
+end    
+
+always @(posedge i_clk) begin
+    for (j=0; j<9; j=j+1) begin
+        mult_holder1[j] <= $signed(kernel1[j]) * $signed(i_pixel_data[8*j+:8]);
+        mult_holder2[j] <= $signed(kernel2[j]) * $signed(i_pixel_data[8*j+:8]);
+    end
+
+    mult_holder_valid1 <= i_pixel_valid;
+    mult_holder_valid2 <= i_pixel_valid;
+end
+
+always @(*) begin
+    add_holder1 = 'd0;
+
+    for (k=0; k<9; k=k+1) begin
+        add_holder1 = $signed(add_holder1) + $signed(mult_holder1[k]);
+    end
+end
+
+always @(*) begin
+    add_holder2 = 'd0;
+
+    for (k=0; k<9; k=k+1) begin
+        add_holder2 = $signed(add_holder2) + $signed(mult_holder2[k]);
+    end
+end
+
+always @(posedge i_clk) begin
+    add_holder_pipelined1 <= add_holder1;
+    add_holder_pipelined2 <= add_holder2;
+
+    add_holder_valid1 <= mult_holder_valid1;
+    add_holder_valid2 <= mult_holder_valid2;
+end
+
+always @(posedge i_clk) begin
+    g1 <= $signed(add_holder_pipelined1)*$signed(add_holder_pipelined1);
+    g2 <= $signed(add_holder_pipelined2)*$signed(add_holder_pipelined2);
+
+    square_holder_valid1 <= add_holder_valid1;
+    square_holder_valid2 <= add_holder_valid2;
+end
+
+always @(posedge i_clk) begin
+    threshold <= g1+g2;
+    threshold_valid <= (square_holder_valid1 && square_holder_valid2);
+end
+
+always @(posedge i_clk) begin
+    if (threshold > 8000)
+        o_pixel <= 8'hff;
+    else
+        o_pixel <= 8'h0;
+
+    o_valid <= threshold_valid;
+end
+`endif
+
 endmodule
 
 /*
+
+COMPLETELY COMBINATIONAL IMPLEMENTATION: DOES NOT SATISFY TIMING CONSTRAINTS
+
 generate
     genvar j;
 

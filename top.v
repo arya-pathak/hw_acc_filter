@@ -37,7 +37,7 @@ output  o_intr
 wire [71:0] unconvulved;
 wire unconvulved_valid;
 
-wire [71:0] convulved;
+wire [7:0] convulved;
 wire convulved_valid;
 
 wire axis_prog_full;
